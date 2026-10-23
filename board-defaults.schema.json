@@ -1,18 +1,15 @@
 {
 	"$id": "board-defaults.schema.json",
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-
 	"$defs": {
 		"pin": {
 			"type": "string",
 			"pattern": "^[AD]?[0-9]\\d*$"
 		},
-
 		"LED_PIN": {
 			"type": "string",
 			"pattern": "^([AD]?[0-9]\\d*|LED_BUILTIN)$"
 		},
-
 		"IMU_TYPE": {
 			"type": "string",
 			"enum": [
@@ -38,13 +35,14 @@
 			],
 			"description": "Imu Type"
 		},
-
 		"PROTOCOL": {
 			"type": "string",
-			"enum": ["I2C", "SPI"],
+			"enum": [
+				"I2C",
+				"SPI"
+			],
 			"description": "Protocol"
 		},
-
 		"IMU_ROTATION": {
 			"type": "string",
 			"enum": [
@@ -63,16 +61,28 @@
 			],
 			"description": "Protocol"
 		},
-
 		"I2C_IMU": {
 			"type": "object",
 			"description": "I2C Imu",
 			"properties": {
-				"protocol": { "const": "I2C" },
-				"imu": { "$ref": "#/$defs/IMU_TYPE" },
-				"sda": { "$ref": "#/$defs/pin", "description": "SDA Pin" },
-				"scl": { "$ref": "#/$defs/pin", "description": "SCL Pin" },
-				"int": { "$ref": "#/$defs/pin", "description": "INT Pin" },
+				"protocol": {
+					"const": "I2C"
+				},
+				"imu": {
+					"$ref": "#/$defs/IMU_TYPE"
+				},
+				"sda": {
+					"$ref": "#/$defs/pin",
+					"description": "SDA Pin"
+				},
+				"scl": {
+					"$ref": "#/$defs/pin",
+					"description": "SCL Pin"
+				},
+				"int": {
+					"$ref": "#/$defs/pin",
+					"description": "INT Pin"
+				},
 				"address": {
 					"type": "number",
 					"description": "IMU Address"
@@ -82,37 +92,59 @@
 					"description": "IMU Rotation"
 				}
 			},
-			"required": ["protocol", "imu", "sda", "scl"]
+			"required": [
+				"protocol",
+				"imu",
+				"sda",
+				"scl"
+			]
 		},
-
 		"SPI_IMU": {
 			"type": "object",
 			"description": "SPI Imu",
 			"properties": {
-				"protocol": { "const": "SPI" },
-				"imu": { "$ref": "#/$defs/IMU_TYPE" },
-				"int": { "$ref": "#/$defs/pin", "description": "INT Pin" },
+				"protocol": {
+					"const": "SPI"
+				},
+				"imu": {
+					"$ref": "#/$defs/IMU_TYPE"
+				},
+				"int": {
+					"$ref": "#/$defs/pin",
+					"description": "INT Pin"
+				},
 				"rotation": {
 					"$ref": "#/$defs/IMU_ROTATION",
 					"description": "IMU Rotation"
 				},
-				"cs": { "$ref": "#/$defs/pin", "description": "CS Pin" }
+				"cs": {
+					"$ref": "#/$defs/pin",
+					"description": "CS Pin"
+				}
 			},
-			"required": ["protocol", "imu", "cs"]
+			"required": [
+				"protocol",
+				"imu",
+				"cs"
+			]
 		},
-
 		"IMU": {
 			"type": "object",
 			"discriminator": {
 				"propertyName": "protocol"
 			},
 			"oneOf": [
-				{ "$ref": "#/$defs/I2C_IMU" },
-				{ "$ref": "#/$defs/SPI_IMU" }
+				{
+					"$ref": "#/$defs/I2C_IMU"
+				},
+				{
+					"$ref": "#/$defs/SPI_IMU"
+				}
 			],
-			"required": ["protocol"]
+			"required": [
+				"protocol"
+			]
 		},
-
 		"BOARD_TYPES": {
 			"type": "string",
 			"enum": [
@@ -131,11 +163,11 @@
 				"BOARD_WEMOSWROOM02",
 				"BOARD_XIAO_ESP32C3",
 				"BOARD_ESP32S3_SUPERMINI",
-				"BOARD_SOMATICVR_ORION"
+				"BOARD_SOMATICVR_ORION",
+				"BOARD_ESP32C6_SUPERMINI"
 			],
 			"description": "Board Type"
 		},
-
 		"BATTERY": {
 			"type": "object",
 			"discriminator": {
@@ -146,13 +178,21 @@
 				{
 					"type": "object",
 					"properties": {
-						"type": { "const": "BAT_EXTERNAL" },
+						"type": {
+							"const": "BAT_EXTERNAL"
+						},
 						"shieldR": {
 							"type": "number",
 							"description": "Battery Shield Resistor (Ohms)"
 						},
-						"r1": { "type": "number", "description": "R1 (Ohms)" },
-						"r2": { "type": "number", "description": "R2 (Ohms)" },
+						"r1": {
+							"type": "number",
+							"description": "R1 (Ohms)"
+						},
+						"r2": {
+							"type": "number",
+							"description": "R2 (Ohms)"
+						},
 						"pin": {
 							"$ref": "#/$defs/pin",
 							"description": "Battery Pin"
@@ -162,31 +202,40 @@
 				{
 					"type": "object",
 					"properties": {
-						"type": { "const": "BAT_INTERNAL" }
+						"type": {
+							"const": "BAT_INTERNAL"
+						}
 					}
 				},
 				{
 					"type": "object",
 					"properties": {
-						"type": { "const": "BAT_MCP3021" }
+						"type": {
+							"const": "BAT_MCP3021"
+						}
 					}
 				},
 				{
 					"type": "object",
 					"properties": {
-						"type": { "const": "BAT_INTERNAL_MCP3021" }
+						"type": {
+							"const": "BAT_INTERNAL_MCP3021"
+						}
 					}
 				}
 			],
-			"required": ["type"]
+			"required": [
+				"type"
+			]
 		},
-
 		"BASIC_IMU_BOARD_CONFIG": {
 			"type": "object",
 			"properties": {
 				"SENSORS": {
 					"type": "array",
-					"items": { "$ref": "#/$defs/IMU" },
+					"items": {
+						"$ref": "#/$defs/IMU"
+					},
 					"minItems": 1,
 					"maxItems": 2,
 					"description": "Sensors List"
@@ -204,13 +253,21 @@
 							"description": "Led inverted"
 						}
 					},
-					"required": ["LED_PIN", "LED_INVERTED"]
+					"required": [
+						"LED_PIN",
+						"LED_INVERTED"
+					]
 				},
-				"BATTERY": { "$ref": "#/$defs/BATTERY" }
+				"BATTERY": {
+					"$ref": "#/$defs/BATTERY"
+				}
 			},
-			"required": ["SENSORS", "LED", "BATTERY"]
+			"required": [
+				"SENSORS",
+				"LED",
+				"BATTERY"
+			]
 		},
-
 		"BoardConfig": {
 			"type": "object",
 			"properties": {
@@ -220,10 +277,18 @@
 				"flashingRules": {
 					"type": "object",
 					"properties": {
-						"needBootPress": { "type": "boolean" },
-						"needManualReboot": { "type": "boolean" },
-						"shouldOnlyUseDefaults": { "type": "boolean" },
-						"applicationOffset": { "type": "integer" }
+						"needBootPress": {
+							"type": "boolean"
+						},
+						"needManualReboot": {
+							"type": "boolean"
+						},
+						"shouldOnlyUseDefaults": {
+							"type": "boolean"
+						},
+						"applicationOffset": {
+							"type": "integer"
+						}
 					},
 					"required": [
 						"needBootPress",
@@ -236,23 +301,32 @@
 					"type": "boolean"
 				}
 			},
-			"required": ["values", "flashingRules"]
+			"required": [
+				"values",
+				"flashingRules"
+			]
 		}
 	},
-
 	"type": "object",
 	"properties": {
 		"toolchain": {
 			"type": "string",
-			"enum": ["platformio"]
+			"enum": [
+				"platformio"
+			]
 		},
 		"defaults": {
 			"type": "object",
 			"propertyNames": {
 				"$ref": "#/$defs/BOARD_TYPES"
 			},
-			"additionalProperties": { "$ref": "#/$defs/BoardConfig" }
+			"additionalProperties": {
+				"$ref": "#/$defs/BoardConfig"
+			}
 		}
 	},
-	"required": ["toolchain", "defaults"]
+	"required": [
+		"toolchain",
+		"defaults"
+	]
 }

@@ -36,7 +36,7 @@ except Exception:
 
 output = f"-DGIT_REV='\"{revision}\"'"
 
-fwVersion = os.environ.get("FIRMWARE_VERSION")
+fwVersion = os.environ.get("FIRMWARE_VERSION") or "0.7.4-Orion-port-udpfix"
 if fwVersion is not None and fwVersion != "":
 	output += f" -DFIRMWARE_VERSION='\"{fwVersion}\"'"
 elif tag != "":

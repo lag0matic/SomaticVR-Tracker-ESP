@@ -96,7 +96,7 @@
 // Not recommended for production
 #define ENABLE_INSPECTION false
 
-#define PROTOCOL_VERSION 21
+#define PROTOCOL_VERSION 23
 
 #ifndef FIRMWARE_VERSION
 #define FIRMWARE_VERSION "UNKNOWN"
@@ -106,10 +106,8 @@
 #define USE_RUNTIME_CALIBRATION true
 #endif
 
-#define DEBUG_MEASURE_SENSOR_TIME_TAKEN false
-
-#ifndef DEBUG_MEASURE_SENSOR_TIME_TAKEN
-#define DEBUG_MEASURE_SENSOR_TIME_TAKEN false
+#ifndef DEBUG_MEASURE_TIME_TAKEN
+#define DEBUG_MEASURE_TIME_TAKEN false
 #endif
 
 #ifndef USE_OTA_TIMEOUT

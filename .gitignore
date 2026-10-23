@@ -8,3 +8,13 @@ compile_commands.json
 node_modules/
 dist/
 .nix-platformio
+
+# Local diagnostics, device flash backups, and packaged artifacts
+output/
+comparison/
+*.log
+*.hex
+*.bin
+*.elf
+__pycache__/
+.venv/

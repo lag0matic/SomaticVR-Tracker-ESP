@@ -3,10 +3,10 @@
 	Copyright (c) 2021 Eiren Rain & SlimeVR contributors
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to
-   deal in the Software without restriction, including without limitation the
-   rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-   sell copies of the Software, and to permit persons to whom the Software is
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
 	furnished to do so, subject to the following conditions:
 
 	The above copyright notice and this permission notice shall be included in
@@ -16,9 +16,9 @@
 	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-   IN THE SOFTWARE.
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	THE SOFTWARE.
 */
 
 #include "serialcommands.h"
@@ -31,8 +31,8 @@
 #include "logging/Logger.h"
 #include "utils.h"
 
-#ifdef ESP32
-#include "nvs_flash.h"
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#include "soc/rtc_cntl_reg.h"
 #endif
 
 #ifdef EXT_SERIAL_COMMANDS
@@ -58,6 +58,14 @@ constexpr const char* FULL_VENDOR_STR
 #else
 constexpr const char* FULL_VENDOR_STR = "Vendor: Unknown, product: Unknown";
 #endif
+
+static const char sCMDFlashmdoe[] PROGMEM
+	= "Entering flashing mode.\r\n"
+	  "You can now close the serial monitor\r\n"
+	  "and go to the firmware flasher to flash\r\n"
+	  "your tracker over USB.\r\n"
+	  "If you entered the flashing mode by accident,\r\n"
+	  "turn your tracker off and on.";
 
 namespace SerialCommands {
 SlimeVR::Logging::Logger logger("SerialCommands");
@@ -158,6 +166,29 @@ void cmdSet(CmdParser* parser) {
 				wifiNetwork.setWiFiCredentials(ssid, ppass);
 				logger.info("CMD SET BWIFI OK: New wifi credentials set, reconnecting");
 			}
+		} else if (parser->equalCmdParam(1, "FLASHMODE")) {
+#if ESP8266
+			logger.info(sCMDFlashmdoe);
+			delay(1000);
+			ESP.rebootIntoUartDownloadMode();
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+			logger.info(sCMDFlashmdoe);
+			delay(1000);
+			// from https://esp32.com/viewtopic.php?t=33180
+			REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+			esp_restart();
+#else
+			logger.error(PSTR("Flashmode is not supported on this device"));
+#endif
+#if EXT_SERIAL_COMMANDS
+		} else if (parser->equalCmdParam(1, "CRASH")) {
+			// well target of this function is to crash the tracker
+			// used for debuging/testing
+			while (true) {
+				int* ptr = NULL;
+				*ptr = 0;
+			}
+#endif
 		} else {
 			logger.error("CMD SET ERROR: Unrecognized variable to set");
 		}
@@ -168,8 +199,7 @@ void cmdSet(CmdParser* parser) {
 
 void printState() {
 	logger.info(
-		"SlimeVR Tracker, board:  %d, hardware: %d, protocol: %d, firmware: "
-		"%s, "
+		"SlimeVR Tracker, board: %d, hardware: %d, protocol: %d, firmware: %s, "
 		"address: %s, mac: %s, status: %d, wifi state: %d",
 		BOARD,
 		HARDWARE_MCU,
@@ -178,7 +208,7 @@ void printState() {
 		wifiNetwork.getAddress().toString().c_str(),
 		WiFi.macAddress().c_str(),
 		statusManager.getStatus(),
-		wifiNetwork.getWiFiState()
+		static_cast<int>(wifiNetwork.getWiFiState())
 	);
 
 	logger.info("%s", FULL_VENDOR_STR);
@@ -192,11 +222,10 @@ void printState() {
 			sensor->isWorking() ? "true" : "false",
 			sensor->getHadData() ? "true" : "false"
 		);
-		// 	const char* mag = sensor->getAttachedMagnetometer();
-		// 	if (mag) {
-		// 		logger.info("Sensor[%d] magnetometer: %s",
-		// sensor->getSensorId(), mag);
-		// }
+		const char* mag = sensor->getAttachedMagnetometer();
+		if (mag) {
+			logger.info("Sensor[%d] magnetometer: %s", sensor->getSensorId(), mag);
+		}
 	}
 	logger.info(
 		"Battery voltage: %.3f, level: %.1f%%",
@@ -260,49 +289,12 @@ void cmdGet(CmdParser* parser) {
 	}
 
 	if (parser->equalCmdParam(1, "CONFIG")) {
-		String str
-			= "BOARD=%d\n"
-			  "IMU=%d\n"
-			  "SECOND_IMU=%d\n"
-			  "IMU_ROTATION=%f\n"
-			  "SECOND_IMU_ROTATION=%f\n"
-			  "BATTERY_MONITOR=%d\n"
-			  "BATTERY_SHIELD_RESISTANCE=%f\n"
-			  "BATTERY_SHIELD_R1=%f\n"
-			  "BATTERY_SHIELD_R2=%f\n"
-			  "PIN_IMU_SDA=%d\n"
-			  "PIN_IMU_SCL=%d\n"
-			  "PIN_IMU_INT=%d\n"
-			  "PIN_IMU_INT_2=%d\n"
-			  "PIN_BATTERY_LEVEL=%d\n"
-			  "LED_PIN=%d\n"
-			  "LED_INVERTED=%d\n";
-
-		Serial.printf(
-			str.c_str(),
-			BOARD,
-			static_cast<int>(sensorManager.getSensorType(0)),
-			static_cast<int>(sensorManager.getSensorType(1)),
-			180.0,  // IMU_ROTATION,
-			180.0,  // SECOND_IMU_ROTATION,
-			BATTERY_MONITOR,
-			BATTERY_SHIELD_RESISTANCE,
-			BATTERY_SHIELD_R1,
-			BATTERY_SHIELD_R2,
-			PIN_IMU_SDA,
-			PIN_IMU_SCL,
-			PIN_IMU_INT,
-			PIN_IMU_INT_2,
-			PIN_BATTERY_LEVEL,
-			LED_PIN,
-			LED_INVERTED
-		);
+		Serial.printf(sSlVRPrInfo);
 	}
 
 	if (parser->equalCmdParam(1, "TEST")) {
 		logger.info(
-			"[TEST] Board: %d, hardware: %d, protocol: %d, firmware: %s, "
-			"address: %s, "
+			"[TEST] Board: %d, hardware: %d, protocol: %d, firmware: %s, address: %s, "
 			"mac: %s, status: %d, wifi state: %d",
 			BOARD,
 			HARDWARE_MCU,
@@ -311,13 +303,12 @@ void cmdGet(CmdParser* parser) {
 			wifiNetwork.getAddress().toString().c_str(),
 			WiFi.macAddress().c_str(),
 			statusManager.getStatus(),
-			wifiNetwork.getWiFiState()
+			static_cast<int>(wifiNetwork.getWiFiState())
 		);
 		auto& sensor0 = sensorManager.getSensors()[0];
 		sensor0->motionLoop();
 		logger.info(
-			"[TEST] Sensor[0]: %s (%.3f %.3f %.3f %.3f) is working: %s, had "
-			"data: %s",
+			"[TEST] Sensor[0]: %s (%.3f %.3f %.3f %.3f) is working: %s, had data: %s",
 			getIMUNameByType(sensor0->getSensorType()),
 			UNPACK_QUATERNION(sensor0->getFusedRotation()),
 			sensor0->isWorking() ? "true" : "false",
@@ -335,14 +326,6 @@ void cmdGet(CmdParser* parser) {
 			logger.error("[TEST] Sensor[0] didn't send any data yet!");
 		} else {
 			logger.info("[TEST] Sensor[0] sent some data, looks working.");
-		}
-		logger.info("[TEST] Status Report:");
-		for (uint8_t i = 0; i < 8; i++) {
-			SlimeVR::Status::Status status
-				= static_cast<SlimeVR::Status::Status>(1u << i);
-			if (statusManager.hasStatus(status)) {
-				logger.info(SlimeVR::Status::statusToString(status));
-			}
 		}
 	}
 
@@ -391,27 +374,8 @@ void cmdReboot(CmdParser* parser) {
 
 void cmdFactoryReset(CmdParser* parser) {
 	logger.info("FACTORY RESET");
-
-	configuration.reset();
-
-	WiFi.disconnect(true);  // Clear WiFi credentials
-#if ESP8266
-	ESP.eraseConfig();  // Clear ESP config
-#elif defined(ESP32)
-	nvs_flash_erase();
-#else
-#warning SERIAL COMMAND FACTORY RESET NOT SUPPORTED
-	logger.info("FACTORY RESET NOT SUPPORTED");
-	return;
-#endif
-
-#if defined(WIFI_CREDS_SSID) && defined(WIFI_CREDS_PASSWD)
-#warning FACTORY RESET does not clear your hardcoded WiFi credentials!
-	logger.warn("FACTORY RESET does not clear your hardcoded WiFi credentials!");
-#endif
-
-	delay(3000);
-	ESP.restart();
+	configuration.factoryReset();
+	// No return here factoryReset will reboot the tracker.
 }
 
 void cmdTemperatureCalibration(CmdParser* parser) {
@@ -441,21 +405,18 @@ void cmdTemperatureCalibration(CmdParser* parser) {
 	logger.info("Usage:");
 	logger.info("  TCAL PRINT: print current temperature calibration config");
 	logger.info(
-		"  TCAL DEBUG: print debug values for the current temperature "
-		"calibration "
+		"  TCAL DEBUG: print debug values for the current temperature calibration "
 		"profile"
 	);
 	logger.info(
-		"  TCAL RESET: reset current temperature calibration in RAM (does not "
-		"delete "
+		"  TCAL RESET: reset current temperature calibration in RAM (does not delete "
 		"already saved)"
 	);
 	logger.info("  TCAL SAVE: save current temperature calibration to persistent flash"
 	);
 	logger.info("Note:");
 	logger.info(
-		"  Temperature calibration config saves automatically when calibration "
-		"percent "
+		"  Temperature calibration config saves automatically when calibration percent "
 		"is at 100%%"
 	);
 }

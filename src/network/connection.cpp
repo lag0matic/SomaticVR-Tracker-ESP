@@ -3,10 +3,10 @@
 	Copyright (c) 2023 SlimeVR Contributors
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to
-   deal in the Software without restriction, including without limitation the
-   rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-   sell copies of the Software, and to permit persons to whom the Software is
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
 	furnished to do so, subject to the following conditions:
 
 	The above copyright notice and this permission notice shall be included in
@@ -16,9 +16,9 @@
 	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-   IN THE SOFTWARE.
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+	THE SOFTWARE.
 */
 
 #include "connection.h"
@@ -191,6 +191,19 @@ bool Connection::sendLongString(const char* str) {
 	MUST_TRANSFER_BOOL(sendInt(size));
 
 	return sendBytes((const uint8_t*)str, size);
+}
+
+void Connection::printCurrentPacket(int len) const {
+	char hexBuffer[sizeof(m_Packet) * 3];
+	for (size_t i = 0; i < static_cast<size_t>(len); i++) {
+		sprintf(hexBuffer + i * 3, "%02x ", m_Packet[i]);
+		if (i % 16 == 15) {
+			hexBuffer[i * 3 + 2] = '\n';
+		}
+	}
+	hexBuffer[len * 3 - 1] = '\0';
+
+	m_Logger.trace("UDP packet contents:\n%s", hexBuffer);
 }
 
 int Connection::getWriteError() { return m_UDP.getWriteError(); }
@@ -376,8 +389,8 @@ void Connection::sendTrackerDiscovery() {
 			MUST_TRANSFER_BOOL(sendShortString(FIRMWARE_VERSION));
 			// MAC address string
 			MUST_TRANSFER_BOOL(sendBytes(mac, 6));
-			// Tracker type to hint the server if it's a glove or normal tracker
-			// or something else
+			// Tracker type to hint the server if it's a glove or normal tracker or
+			// something else
 			MUST_TRANSFER_BOOL(sendByte(static_cast<uint8_t>(TRACKER_TYPE)));
 			static_assert(std::string_view{VENDOR_NAME}.size() <= 255);
 			MUST_TRANSFER_BOOL(sendShortString(VENDOR_NAME));
@@ -544,31 +557,14 @@ void Connection::searchForServer() {
 			break;
 		}
 
-		// https://github.com/SlimeVR/SlimeVR-Tracker-ESP/issues/516 fix
-		// from
-		// https://github.com/kounocom/SlimeVR-Tracker-ESP/commit/6e21ba0b0d7d719bb924deadef41a9e6d8fccb2d#diff-f9c2c74e084edc8f3bda0c3f9eb75959d82ef5da197cabed835b90c0e92f6524L547
-
-#ifdef ESP32
-		if (packetSize > sizeof(m_Packet)) {
-			// ESP32 seemingly gets stuck when the packet is bigger than the
-			// buffer it has This only happens with packets not meant for it
-			// being incidentally received For compatibility we ignore these and
-			// flush the UDP buffer
-			m_UDP.flush();
-			while (packetSize > 0) {
-				packetSize -= m_UDP.read(
-					m_Packet,
-					std::min(sizeof(m_Packet), static_cast<size_t>(packetSize))
-				);
-			}
-			continue;
-		}
-#endif
-
-		// end fix
-
 		// receive incoming UDP packets
-		[[maybe_unused]] int len = m_UDP.read(m_Packet, sizeof(m_Packet));
+		#ifdef ESP32
+        if (packetSize > static_cast<int>(sizeof(m_Packet))) {
+            m_UDP.clear();  // Discard the entire oversized datagram, including unread bytes.
+            continue;
+        }
+#endif
+        int len = m_UDP.read(m_Packet, sizeof(m_Packet));
 
 #ifdef DEBUG_NETWORK
 		m_Logger.trace(
@@ -577,11 +573,11 @@ void Connection::searchForServer() {
 			m_UDP.remoteIP().toString().c_str(),
 			m_UDP.remotePort()
 		);
-		m_Logger.traceArray("UDP packet contents: ", m_Packet, len);
+		printCurrentPacket(len);
 #endif
 
-		// Handshake is different, it has 3 in the first byte, not the 4th, and
-		// data starts right after
+		// Handshake is different, it has 3 in the first byte, not the 4th, and data
+		// starts right after
 		if (static_cast<ReceivePacketType>(m_Packet[0])
 			== ReceivePacketType::Handshake) {
 			if (strncmp((char*)m_Packet + 1, "Hey OVR =D 5", 12) != 0) {
@@ -683,31 +679,13 @@ void Connection::update() {
 		return;
 	}
 
-	// https://github.com/SlimeVR/SlimeVR-Tracker-ESP/issues/516 fix
-	// from
-	// https://github.com/kounocom/SlimeVR-Tracker-ESP/commit/6e21ba0b0d7d719bb924deadef41a9e6d8fccb2d#diff-f9c2c74e084edc8f3bda0c3f9eb75959d82ef5da197cabed835b90c0e92f6524L547
-
-#ifdef ESP32
-	if (packetSize > sizeof(m_Packet)) {
-		// ESP32 seemingly gets stuck when the packet is bigger than the buffer
-		// it has This only happens with packets not meant for it being
-		// incidentally received For compatibility we ignore these and flush the
-		// UDP buffer
-		m_UDP.flush();
-		while (packetSize > 0) {
-			packetSize -= m_UDP.read(
-				m_Packet,
-				std::min(sizeof(m_Packet), static_cast<size_t>(packetSize))
-			);
-		}
-		return;
-	}
+	#ifdef ESP32
+        if (packetSize > static_cast<int>(sizeof(m_Packet))) {
+            m_UDP.clear();  // Discard the entire oversized datagram, including unread bytes.
+            return;
+        }
 #endif
-
-	// end fix
-
-	m_LastPacketTimestamp = millis();
-	int len = m_UDP.read(m_Packet, sizeof(m_Packet));
+        int len = m_UDP.read(m_Packet, sizeof(m_Packet));
 
 #ifdef DEBUG_NETWORK
 	m_Logger.trace(
@@ -716,11 +694,17 @@ void Connection::update() {
 		m_UDP.remoteIP().toString().c_str(),
 		m_UDP.remotePort()
 	);
-	m_Logger.traceArray("UDP packet contents: ", m_Packet, len);
+	printCurrentPacket(len);
 #else
 	(void)packetSize;
 #endif
 
+	if (static_cast<ReceivePacketType>(m_Packet[3]) == ReceivePacketType::Handshake) {
+		m_Logger.warn("Handshake received again, ignoring");
+		return;
+	}
+
+	m_LastPacketTimestamp = millis();
 	switch (static_cast<ReceivePacketType>(m_Packet[3])) {
 		case ReceivePacketType::HeartBeat:
 			sendHeartbeat();
@@ -730,8 +714,7 @@ void Connection::update() {
 			break;
 
 		case ReceivePacketType::Handshake:
-			// Assume handshake successful
-			m_Logger.warn("Handshake received again, ignoring");
+			// handled above
 			break;
 
 		case ReceivePacketType::Command:
@@ -794,8 +777,8 @@ void Connection::update() {
 		}
 
 		case ReceivePacketType::SetConfigFlag: {
-			// Packet type (4) + Packet number (8) + sensor_id(1) + flag_id (2)
-			// + state (1)
+			// Packet type (4) + Packet number (8) + sensor_id(1) + flag_id (2) + state
+			// (1)
 			if (len < 16) {
 				m_Logger.warn("Invalid sensor config flag packet: too short");
 				break;

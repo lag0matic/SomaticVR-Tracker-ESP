@@ -26,7 +26,7 @@
 #include "../consts.h"
 
 #ifndef LED_BUILTIN
-#define LED_BUILTIN LED_PIN_NONE
+#define LED_BUILTIN LED_OFF
 #endif
 
 #ifndef LED_PIN

@@ -65,6 +65,7 @@ public:
 		, sensorId(id)
 		, sensorType(type)
 		, sensorOffset(rotation)
+		, inverseSensorOffset(sensorOffset.inverse())
 		, m_Logger(SlimeVR::Logging::Logger(sensorName)) {
 		char buf[4];
 		sprintf(buf, "%u", id);
@@ -72,14 +73,14 @@ public:
 		addr = registerInterface.getAddress();
 	}
 
-	virtual ~Sensor() {};
-	virtual void motionSetup() {};
-	virtual void postSetup() {};
-	virtual void motionLoop() {};
+	virtual ~Sensor(){};
+	virtual void motionSetup(){};
+	virtual void postSetup(){};
+	virtual void motionLoop(){};
 	virtual void sendData();
 	virtual void setAcceleration(Vector3 a);
 	virtual void setFusedRotation(Quat r);
-	virtual void startCalibration(int calibrationType) {};
+	virtual void startCalibration(int calibrationType){};
 	virtual SensorStatus getSensorState();
 	virtual void printTemperatureCalibrationState();
 	virtual void printDebugTemperatureCalibrationState();
@@ -132,6 +133,7 @@ protected:
 	 * (Y to top of the tracker, Z to front, X to left)
 	 */
 	Quat sensorOffset;
+	Quat inverseSensorOffset;
 
 	bool newFusedRotation = false;
 	Quat fusedRotation{};

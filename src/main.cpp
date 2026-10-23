@@ -25,15 +25,19 @@
 
 #include "ButtonMonitor.h"
 #include "ChargerMonitor.h"
-#include "GlobalVars.h"
 #include "USBPDMonitor.h"
+#include "GlobalVars.h"
 #include "Wire.h"
 #include "batterymonitor.h"
 #include "credentials.h"
-#include "debugging/TimeTaken.h"
+#include "debugging/Benchmark.h"
 #include "globals.h"
 #include "logging/Logger.h"
+#include "logging/SerialBuffer.h"
 #include "ota.h"
+// Orion must initialize its power latch before optional boot diagnostics.
+// Retain the factory-reset flag without the upstream early boot hook.
+bool initFullreset = false;
 #include "serial/serialcommands.h"
 #include "status/TPSCounter.h"
 
@@ -41,16 +45,28 @@ Timer<> globalTimer;
 SlimeVR::Logging::Logger logger("SlimeVR");
 SlimeVR::Sensors::SensorManager sensorManager;
 SlimeVR::LEDManager ledManager;
-#ifdef PIN_BUTTON_INPUT
-SlimeVR::ButtonMonitor buttonMonitor(PIN_BUTTON_INPUT);
-#endif
-
 SlimeVR::Status::StatusManager statusManager;
 SlimeVR::Configuration::Configuration configuration;
 SlimeVR::Network::Manager networkManager;
 SlimeVR::Network::Connection networkConnection;
 SlimeVR::WiFiNetwork wifiNetwork;
 SlimeVR::WifiProvisioning wifiProvisioning;
+
+SlimeVR::Debugging::Benchmark tpsCounterBM{"tpsCounter.update()"};
+SlimeVR::Debugging::Benchmark globalTimerBM{"globalTimer.tick()"};
+SlimeVR::Debugging::Benchmark serialCommandsBM{"SerialCommands::update()"};
+SlimeVR::Debugging::Benchmark otaBM{"OTA::otaUpdate()"};
+SlimeVR::Debugging::Benchmark networkManagerBM{"networkManager.update()"};
+SlimeVR::Debugging::Benchmark sensorManagerBM{"sensorManager.update()"};
+SlimeVR::Debugging::Benchmark batteryBM{"battery.Loop()"};
+SlimeVR::Debugging::Benchmark ledManagerBM{"ledManager.update()"};
+SlimeVR::Debugging::Benchmark i2cScanBM{"I2CSCAN::update()"};
+SlimeVR::Debugging::Benchmark targetLooptimeBM{"TARGET_LOOPTIME_MICROS"};
+SlimeVR::Debugging::Benchmark printStateBM{"Serial printState()"};
+
+#ifdef PIN_BUTTON_INPUT
+SlimeVR::ButtonMonitor buttonMonitor(PIN_BUTTON_INPUT);
+#endif
 
 #ifdef PIN_USB_PD_INT
 SlimeVR::USBPDMonitor usbPDMonitor(0x22, PIN_USB_PD_INT);
@@ -59,9 +75,6 @@ SlimeVR::USBPDMonitor usbPDMonitor(0x22, PIN_USB_PD_INT);
 SlimeVR::ChargerMonitor chargerMonitor(PIN_CHARGER_INT);
 #endif
 
-#if DEBUG_MEASURE_SENSOR_TIME_TAKEN
-SlimeVR::Debugging::TimeTakenMeasurer sensorMeasurer{"Sensors"};
-#endif
 
 int sensorToCalibrate = -1;
 bool blinking = false;
@@ -106,7 +119,11 @@ void setup() {
 	}
 #endif
 
+
 	Serial.begin(serialBaudRate);
+	// Enable immediate printing of data by the SerialBuffer for the length
+	// of the setup function
+	SlimeVR::Logging::SerialBuffer::getInstance().enableImmediateMode(true);
 	globalTimer = timer_create_default();
 
 	Serial.println();
@@ -188,7 +205,6 @@ void setup() {
 
 	chargerMonitor.setup();
 	usbPDMonitor.setup();
-
 	sensorManager.setup();
 
 	networkManager.setup();
@@ -201,32 +217,66 @@ void setup() {
 
 	loopTime = micros();
 	tpsCounter.reset();
+
+	SlimeVR::Logging::SerialBuffer::getInstance().enableImmediateMode(false);
 }
 
 void loop() {
+	tpsCounterBM.before();
 	tpsCounter.update();
+	tpsCounterBM.after();
+
+	globalTimerBM.before();
 	globalTimer.tick();
+	globalTimerBM.after();
+
+	serialCommandsBM.before();
 	SerialCommands::update();
+	serialCommandsBM.after();
+
+	otaBM.before();
 	OTA::otaUpdate();
+	otaBM.after();
+
+	networkManagerBM.before();
 	chargerMonitor.update();
 	usbPDMonitor.update();
 	networkManager.update();
+	networkManagerBM.after();
 
-#if DEBUG_MEASURE_SENSOR_TIME_TAKEN
-	sensorMeasurer.before();
-#endif
+	sensorManagerBM.before();
 	sensorManager.update();
-#if DEBUG_MEASURE_SENSOR_TIME_TAKEN
-	sensorMeasurer.after();
-#endif
+	sensorManagerBM.after();
 
+	batteryBM.before();
 	battery.Loop();
+	batteryBM.after();
+
+	ledManagerBM.before();
 #ifdef PIN_BUTTON_INPUT
 	buttonMonitor.update();
 #endif
 	ledManager.update();
+	ledManagerBM.after();
+
+	i2cScanBM.before();
 	I2CSCAN::update();
+	i2cScanBM.after();
+
+#if defined(PRINT_STATE_EVERY_MS) && PRINT_STATE_EVERY_MS > 0
+	printStateBM.before();
+	unsigned long now = millis();
+	if (lastStatePrint + PRINT_STATE_EVERY_MS < now) {
+		lastStatePrint = now;
+		SerialCommands::printState();
+	}
+	printStateBM.after();
+#endif
+
+	SlimeVR::Logging::Logger::tick();
+
 #ifdef TARGET_LOOPTIME_MICROS
+	targetLooptimeBM.before();
 	long elapsed = (micros() - loopTime);
 	if (elapsed < TARGET_LOOPTIME_MICROS) {
 		long sleepus = TARGET_LOOPTIME_MICROS - elapsed - 100;  // µs to sleep
@@ -241,12 +291,7 @@ void loop() {
 		}
 	}
 	loopTime = micros();
+	targetLooptimeBM.after();
 #endif
-#if defined(PRINT_STATE_EVERY_MS) && PRINT_STATE_EVERY_MS > 0
-	unsigned long now = millis();
-	if (lastStatePrint + PRINT_STATE_EVERY_MS < now) {
-		lastStatePrint = now;
-		SerialCommands::printState();
-	}
-#endif
+	SlimeVR::Debugging::Benchmark::tick();
 }
