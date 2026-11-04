@@ -1,8 +1,12 @@
 # SomaticVR Orion - SlimeVR 0.7.4 + battfix
 
-Firmware version: **`0.7.4-Orion-battfix1`**. This branch combines our working 0.7.4 udpfix port with SomaticVR's `chargerFix` battery/button updates and additional power-latch and PD recovery fixes.
+Firmware version: **`0.7.4-Orion-battfix2`**. This branch combines our working 0.7.4 udpfix port with SomaticVR's `chargerFix` battery/button updates and additional power-latch and PD recovery fixes.
 
 **Status: test firmware.** It builds and passes software regression tests. This combined version has not yet been qualified on physical trackers, across flash/OTA resets, or through overnight stack charging. Keep your known-good `0.7.4-Orion-port-udpfix` backup and test one tracker first.
+
+## Additional battfix2 fixes
+
+Fixes signed LED ramp arithmetic and charging-animation entry, polls the charger even while its interrupt is asserted, and corrects fixed-PDO/PPS diagnostic unit conversions. PD logs describe the negotiated current limit, not measured draw. See CHANGELOG.md.
 
 ## What changed
 
@@ -28,7 +32,7 @@ python -m pip install -r requirements-build.txt
 python -m platformio run -e BOARD_SOMATICVR_ORION
 ```
 
-The default build version is `0.7.4-Orion-battfix1`; `FIRMWARE_VERSION` can override it. Git revision is embedded separately. Dependency downloads require network access; byte-for-byte identity across different environments is not guaranteed.
+The default build version is `0.7.4-Orion-battfix2`; `FIRMWARE_VERSION` can override it. Git revision is embedded separately. Dependency downloads require network access; byte-for-byte identity across different environments is not guaranteed.
 
 Outputs in `.pio/build/BOARD_SOMATICVR_ORION/`:
 

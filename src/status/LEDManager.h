@@ -109,6 +109,7 @@ private:
 #if ESP32 && ENABLE_LEDC
 	int m_ledcFrequency = LEDC_FREQ_LED;
 	uint8_t m_ledcBits = LEDC_BITS_LED;
+	bool m_WasCharging = false;
 	int m_rampDifference;
 	unsigned int m_CurrentBrightness;
 	unsigned int m_rampStartBrightness;

@@ -1,3 +1,4 @@
+#include "RampMath.h"
 /*
 	SlimeVR Code is placed under the MIT license
 	Copyright (c) 2022 TheDevMinerTV
@@ -112,11 +113,7 @@ void LEDManager::setRamp(
 	m_CurrentStage = RAMP;
 	m_rampStartBrightness = startBrightness;
 	m_rampEndBrightness = endBrightness;
-	m_rampDifference = ((int)m_rampEndBrightness - (int)m_rampStartBrightness)
-					 / (ms / LED_RAMP_MILLIS);
-	if (m_rampDifference > m_rampEndBrightness) {
-		m_rampDifference = m_rampEndBrightness;
-	}
+	m_rampDifference = rampStep(startBrightness, endBrightness, ms, LED_RAMP_MILLIS);
 	m_Logger.trace(
 		"Ramp Start: %d, end: %d, ramp: %d",
 		startBrightness,
@@ -145,6 +142,18 @@ void LEDManager::update() {
 	}
 
 	m_LastUpdate = time;
+#if ESP32 && ENABLE_LEDC
+    const bool charging = statusManager.hasStatus(Status::BATTERY_CHARGING)
+        && !statusManager.hasStatus(Status::BATTERY_CHARGE_COMPLETE)
+        && !statusManager.hasStatus(Status::SHUTDOWN);
+    if (charging && !m_WasCharging) {
+        setRamp(10.0f, 100.0f, 2000);
+        m_CurrentStage = RAMP_CONTINUOUS;
+        m_Timer = 0;
+    }
+    m_WasCharging = charging;
+#endif
+
 
 	unsigned int length = 0;
 	unsigned int count = 0;
@@ -344,12 +353,8 @@ void LEDManager::update() {
 					m_rampStartBrightness,
 					m_rampEndBrightness
 				);
-				setBrightness(m_CurrentBrightness + m_rampDifference);
-				if (((m_rampDifference > 0)
-					 && (m_CurrentBrightness >= m_rampEndBrightness))
-					|| ((m_rampDifference < 0)
-						&& (m_CurrentBrightness <= -m_rampDifference))
-					|| (m_rampDifference == 0)) {
+				setBrightness(advanceRamp(m_CurrentBrightness, m_rampDifference, m_rampEndBrightness));
+				if (m_CurrentBrightness == m_rampEndBrightness) {
 					m_CurrentStage = (m_CurrentBrightness > 0) ? ON : OFF;
 				}
 				break;
@@ -361,12 +366,8 @@ void LEDManager::update() {
 					m_rampStartBrightness,
 					m_rampEndBrightness
 				);
-				setBrightness(m_CurrentBrightness + m_rampDifference);
-				if (((m_rampDifference > 0)
-					 && (m_CurrentBrightness >= m_rampEndBrightness))
-					|| ((m_rampDifference < 0)
-						&& (m_CurrentBrightness <= -m_rampDifference))
-					|| (m_rampDifference == 0)) {
+				setBrightness(advanceRamp(m_CurrentBrightness, m_rampDifference, m_rampEndBrightness));
+				if (m_CurrentBrightness == m_rampEndBrightness) {
 					unsigned int temp = m_rampStartBrightness;
 					m_rampStartBrightness = m_rampEndBrightness;
 					m_rampEndBrightness = temp;

@@ -105,9 +105,9 @@ void ChargerMonitor::update() {
 		unsigned long time = millis();
 		unsigned long diff = time - m_LastUpdate;
 
-		// Don't tick the ChargerManager *too* often, unless an Interrupt occurred
-		if ((diff < 250) || (digitalRead(PIN_CHARGER_INT) == LOW)
-			|| (time < POWERTESTSTARTUPTIME)) {
+		// Poll at a bounded rate even while the active-low interrupt is asserted.
+        // Status/fault reads service the charger; INT must not suppress them.
+		if ((diff < 250) || (time < POWERTESTSTARTUPTIME)) {
 			return;
 		}
 

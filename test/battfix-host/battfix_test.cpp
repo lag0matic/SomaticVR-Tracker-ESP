@@ -2,6 +2,8 @@
 #include <cstdio>
 #define PIN_ENABLE_LATCH 2
 #include "../../src/PowerLatch.h"
+#include "../../src/status/RampMath.h"
+#include "../../src/PDUnits.h"
 #include "../../lib/FUSB302/FUSB302_UFP.cpp"
 static bool unstable=true, failure=false;
 static unsigned reads=0, delays=0;
@@ -15,6 +17,23 @@ static FUSB302_ret_t writeMock(uint8_t,uint8_t,uint8_t*,uint8_t) {return FUSB302
 static FUSB302_ret_t delayMock(uint32_t n) {delays+=n;return FUSB302_SUCCESS;}
 int main() {
  using namespace SlimeVR;
+ assert(pdVoltage(100,false)==5.0f);
+ assert(pdVoltage(180,false)==9.0f);
+ assert(pdCurrent(150,false)==1.5f);
+ assert(pdVoltage(250,true)==5.0f);
+ assert(pdCurrent(30,true)==1.5f);
+
+ assert(rampStep(1023,511,1000,50)==-25);
+ assert(rampStep(511,0,1000,50)==-25);
+ assert(rampStep(102,1023,2000,50)==23);
+ assert(rampStep(5,0,0,50)==-5);
+ assert(rampStep(5,4,10000,50)==-1);
+ unsigned brightness=1023;
+ for(int i=0;i<21;i++)brightness=advanceRamp(brightness,-25,511);
+ assert(brightness==511);
+ assert(advanceRamp(1,-25,0)==0);
+ assert(advanceRamp(1010,23,1023)==1023);
+
  assert(!shouldLatchAtStartup(false,ESP_RST_POWERON));
  assert(!shouldLatchAtStartup(false,ESP_RST_BROWNOUT));
  assert(!shouldLatchAtStartup(false,ESP_RST_DEEPSLEEP));
@@ -34,5 +53,5 @@ int main() {
  assert(FUSB302_state_unattached(&dev,&events)==FUSB302_ERR_READ_DEVICE && reads==1);
  failure=false;unstable=false;
  assert(FUSB302_state_unattached(&dev,&events)==FUSB302_SUCCESS && (events&FUSB302_EVENT_ATTACHED));
- puts("PASS: startup reset policy, latch high/low transitions and operation order, bounded PD errors, PD recovery");
+ puts("PASS: ramp directions/endpoints, PD units, startup/reset policy, latch transitions, bounded PD errors and recovery");
 }

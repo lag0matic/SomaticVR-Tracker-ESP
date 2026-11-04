@@ -22,13 +22,10 @@
 */
 
 #include "USBPDMonitor.h"
+#include "PDUnits.h"
 
 #include "GlobalVars.h"
 #include "status/Status.h"
-
-/* For use in PD_protoco_get_power_info() */
-#define PD_Vrev(v) (((float)v - 0.01 / 20.0))
-#define PD_Arev(a) (((float)a - 0.01 / 100.0))
 
 /* For use in PD_protocol_set_PPS_option() */
 #define PPS_Vrev(v) ((uint16_t)(v * 50 + 0.01))
@@ -60,9 +57,10 @@ void USBPDMonitor::update() {
 		m_LastUpdate = time;
 
 		// device.print_status();
-		if (device.is_power_ready() && (device.get_voltage() < 98.0f)) {
-			m_Logger.debug("PD Voltage: %f", PD_Vrev(device.get_voltage()));
-			m_Logger.debug("PD Current: %f", PD_Arev(device.get_current()));
+		const bool pps = device.is_PPS_ready();
+		if (device.is_power_ready() || pps) {
+			m_Logger.debug("PD contract voltage: %f V", pdVoltage(device.get_voltage(), pps));
+			m_Logger.debug("PD contract current limit: %f A", pdCurrent(device.get_current(), pps));
 		}
 	}
 }

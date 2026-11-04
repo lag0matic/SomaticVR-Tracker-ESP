@@ -1,5 +1,15 @@
 # Change history and provenance
 
+## 0.7.4-Orion-battfix2 (candidate)
+
+- Fix signed ramp division/comparison: descending LED fades no longer become a large positive step. Clamp each brightness update to its actual target, handle sub-tick durations, and guarantee progress for small ramps.
+- Starting charging explicitly initializes its breathing ramp, even if the prior state was a downward fade. Charging priority still yields to shutdown and full status.
+- Remove the inverted charger interrupt gate. Poll every 250 ms after the existing startup delay even when INT is low. No new busy polling is added.
+- Correct PD debug voltage/current scaling for fixed PDO and PPS units. Remove the raw-voltage filter that excluded typical ready contracts. These changes do not alter negotiated voltages or current settings.
+- Watchdog disable and board ID collision avoidance already existed in battfix1 and remain unchanged. The source driver targets BQ24195; a report referring to BQ24196 is not physical chip identification.
+- Host tests cover descending and ascending ramps, endpoint clamping, short durations, PD unit conversions, power-latch reset policy and PD failure recovery. New combined hardware behavior remains unverified.
+
+
 ## 0.7.4-Orion-battfix1 (candidate)
 
 Base: the user-tested 0.7.4 udpfix port, commit `7682e05` on `codex/orion-0.7.4`.
