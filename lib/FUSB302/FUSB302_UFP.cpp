@@ -313,16 +313,20 @@ static FUSB302_ret_t FUSB302_state_unattached(FUSB302_dev_t *dev, FUSB302_event_
         REG_MEASURE = 49;
         REG_WRITE(ADDRESS_SWITCHES0, &REG_SWITCHES0, 3);
         dev->delay_ms(1);
-        while (FUSB302_read_cc_lvl(dev, &dev->cc1) != FUSB302_SUCCESS) {
-            dev->delay_ms(1);
+        /* Defer unstable readings to a later service call; never spin here. */
+        FUSB302_ret_t cc1_result = FUSB302_read_cc_lvl(dev, &dev->cc1);
+        if (cc1_result != FUSB302_SUCCESS) {
+            return cc1_result;
         }
 
         /* read cc2 */
         REG_SWITCHES0 = PDWN1 | PDWN2 | MEAS_CC2;
         REG_WRITE(ADDRESS_SWITCHES0, &REG_SWITCHES0, 1);
         dev->delay_ms(1);
-        while (FUSB302_read_cc_lvl(dev, &dev->cc2) != FUSB302_SUCCESS) {
-            dev->delay_ms(1);
+        /* Defer unstable readings to a later service call; never spin here. */
+        FUSB302_ret_t cc2_result = FUSB302_read_cc_lvl(dev, &dev->cc2);
+        if (cc2_result != FUSB302_SUCCESS) {
+            return cc2_result;
         }
 
         /* clear interrupt */

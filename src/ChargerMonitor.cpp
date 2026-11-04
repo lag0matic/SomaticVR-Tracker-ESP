@@ -22,6 +22,7 @@
 */
 
 #include "ChargerMonitor.h"
+#include "PowerLatch.h"
 
 #include "GlobalVars.h"
 #include "status/Status.h"
@@ -40,7 +41,7 @@ void ChargerMonitor::setup() {
 	}
 
 	// Set the input current limit to 2 A and the overload input voltage to 3.88 V
-	if (!PMIC.setInputCurrentLimit(2.0)) {
+	if (!PMIC.setInputCurrentLimit(1.5)) {
 		isSetup = false;
 		m_Logger.warn("Error in set input current limit");
 	}
@@ -81,6 +82,11 @@ void ChargerMonitor::setup() {
 		m_Logger.warn("Error disabling Charge mode");
 	}
 
+	if (!PMIC.disableWatchdog()) {
+		isSetup = false;
+		m_Logger.warn("Error disabling Watchdog");
+	}
+
 	if (!isSetup) {
 		isSetup = false;
 		m_Logger.warn("Charger Setup Failed");
@@ -107,7 +113,7 @@ void ChargerMonitor::update() {
 
 		m_LastUpdate = time;
 		if (PMIC.isPowerGood() && time >= POWERTESTSTARTUPTIME) {
-			digitalWrite(PIN_ENABLE_LATCH, HIGH);
+			setPowerLatch(true);
 
 			// getChargeFault() returns the charge fault state, the fault could be:
 			//   - Thermal shutdown: occurs if internal junction temperature exceeds

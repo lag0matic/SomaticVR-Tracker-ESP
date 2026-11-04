@@ -1,38 +1,55 @@
-# SomaticVR Orion firmware - SlimeVR 0.7.4 port
+# SomaticVR Orion - SlimeVR 0.7.4 + battfix
 
-Orion hardware support ported onto SlimeVR Tracker ESP 0.7.4. The working firmware identifies as `0.7.4-Orion-port-udpfix`.
+Firmware version: **`0.7.4-Orion-battfix1`**. This branch combines our working 0.7.4 udpfix port with SomaticVR's `chargerFix` battery/button updates and additional power-latch and PD recovery fixes.
+
+**Status: test firmware.** It builds and passes software regression tests. This combined version has not yet been qualified on physical trackers, across flash/OTA resets, or through overnight stack charging. Keep your known-good `0.7.4-Orion-port-udpfix` backup and test one tracker first.
+
+## What changed
+
+| Area | Changes from SomaticVR Orion-2 |
+|---|---|
+| SlimeVR 0.7.4 | Upstream protocol 23, sensor acceleration coordinate correction, calibration-file validation, magnetometer timestep handling, sensor timing behavior, buffered logging, benchmarks (disabled by default), updated configuration/reset/serial commands. Orion's quaternion sensor orientation and hardware integration are preserved. |
+| ESP32 networking | Restores Orion's oversized UDP protection using `NetworkUDP::clear()`. Unread oversized datagrams otherwise prevent subsequent server packets from being received. |
+| Battery updates from SomaticVR | Input current limit reduced from 2 A to 1.5 A; charger watchdog explicitly disabled during setup. Battery charge-current setting remains 1 A, charge voltage setting 4.2 V, and thermal-regulation setting 60 C. Other hardware protections and charge safety timer are retained. |
+| Button handling from SomaticVR | Uses elapsed milliseconds rather than loop counts: normal shutdown arms at 2 seconds and occurs on release; full off at 10 seconds. |
+| Power-latch fixes | All latch writes use a common helper that preloads the output before releasing GPIO hold and then restores hold. Charger-triggered HIGH transitions can now change a previously held LOW output. Startup distinguishes cold/charging-only entry from warm resets rather than requiring a held button after software reset. |
+| USB-PD recovery | Unstable CC readings and I2C errors return to the main loop instead of retrying indefinitely. PD servicing makes one alert attempt per call and retries later. Individual I2C operations retain their existing timeout. |
+| Build safeguards | Link-time optimization keeps the final binary inside the existing application partition. Build checks the actual binary size, produces a complete Intel HEX and verifies its checksums and decoded bytes. |
+| Board identity | Uses upstream `BOARD_CUSTOM` (4), avoiding Orion's old ID 27 collision with ESP32-C6 Supermini. Orion pins and sensor mounting remain unchanged. |
+
+See [CHANGELOG.md](CHANGELOG.md) for source provenance, startup behavior and differences from the earlier experimental builds.
 
 ## Build
 
-Use Python 3.12, Git and PlatformIO:
+Requires Git, Python 3.12 and PlatformIO. From this branch:
 
 ```sh
 python -m pip install -r requirements-build.txt
 python -m platformio run -e BOARD_SOMATICVR_ORION
 ```
 
-Outputs are in `.pio/build/BOARD_SOMATICVR_ORION/`:
+The default build version is `0.7.4-Orion-battfix1`; `FIRMWARE_VERSION` can override it. Git revision is embedded separately. Dependency downloads require network access; byte-for-byte identity across different environments is not guaranteed.
 
-- `firmware.hex`: complete, verified Intel HEX for Somatic Eros Flasher.
-- `firmware.hex.sha256`: checksum of the HEX.
-- `firmware.bin`: application only; do not flash this at address zero.
+Outputs in `.pio/build/BOARD_SOMATICVR_ORION/`:
 
-The build rejects application binaries larger than their partition and verifies the packaged HEX against its input bytes. Link-time optimization is required to fit the existing partition layout. You can override the displayed version with the `FIRMWARE_VERSION` environment variable.
+- **`firmware.hex`**: merged Intel HEX for Somatic Eros Flasher.
+- `firmware.hex.sha256`: checksum.
+- `firmware.bin`: application-only image, **not** a file to flash at address zero.
 
-## Hardware and changes
+The existing 4 MiB layout is retained: bootloader `0x0000`, partitions `0x8000`, OTA initialization `0xe000`, application `0x10000`. The merged HEX fills gaps with erased bytes, so the flasher may reset saved Wi-Fi settings. Keep a backup before flashing.
 
-Preserves Orion ESP32-C3 pins, quaternion sensor mounting, power latch, button, vibration, charging/USB-PD, battery monitoring and LEDs. Uses upstream protocol 23 and acceleration correction, calibration-file validation and logging. The upstream early recovery hook is intentionally disabled so Orion retains its original startup sequence. Orion uses `BOARD_CUSTOM` (4), avoiding ID 27's collision with upstream ESP32-C6 Supermini.
+## Validation and first tracker test
 
-Restores the Orion ESP32 oversized UDP packet workaround using `NetworkUDP::clear()`. Unread packet data otherwise prevents subsequent packets from being received under Arduino ESP32 3.0.1.
+Software tests exercise startup reset policy, latch operation order, high/low transitions, failed/unstable PD reads and recovery. See [host-test instructions](test/battfix-host/README.md). CI builds the firmware and runs these tests; it does not validate electrical behavior.
 
-## Validation
+On one tracker, verify button-on/off on battery, cold USB connection, reboot after USB flashing, OTA reboot, sensor motion and sustained Wi-Fi transmission. Then test direct charging, two-tracker handoff, and overnight maintenance. Confirm the displayed firmware version before updating a set.
 
-The user reported the udpfix firmware working on their trackers after the earlier boot and connection issues were corrected. This is user testing, not a complete hardware qualification. Check power, charging, battery, rotation, sustained Wi-Fi data and mounting calibration on one tracker before updating a set.
+## AI-assisted development
 
-The original `port-test`, `bootfix1`, and `sizefix` images are superseded. No device dumps, Wi-Fi credentials, local build environments or diagnostic logs are included in this source tree.
+This firmware was developed with assistance from OpenAI Codex. AI-assisted changes can contain errors; successful compilation and software tests do not establish hardware safety or reliability. Review the source and validate it on your hardware before wider use. This is a community fork, not an official SomaticVR or SlimeVR release. Provided as-is under the included licenses, without warranty.
 
-## Provenance and licensing
+## Credits and licensing
 
-Based on SlimeVR/SlimeVR-Tracker-ESP 0.7.4 and SomaticVR/SomaticVR-Tracker-ESP v0.7.2-Orion-2 supplied by the user. Beta-3 source was unavailable. Preserve the upstream and SomaticVR copyright notices. See LICENSE-MIT and LICENSE-APACHE.
+Based on SlimeVR Tracker ESP 0.7.4, SomaticVR Orion-2, and SomaticVR's `chargerFix` branch. Original copyright notices are retained. See LICENSE-MIT and LICENSE-APACHE, plus individual vendored-library licenses.
 
-The vendor update URL is retained from Orion. Updating from that vendor feed may replace this custom port.
+Vendor OTA/update metadata remains pointed at SomaticVR; using that feed may replace this custom build. This repository's workflow only builds artifacts and does not publish releases automatically. Device flash dumps, personal credentials and diagnostic logs are not included.

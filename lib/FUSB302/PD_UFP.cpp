@@ -100,7 +100,9 @@ void PD_UFP_c::run(void)
 {
     if (timer() || digitalRead(int_pin) == 0) {
         FUSB302_event_t FUSB302_events = 0;
-        for (uint8_t i = 0; i < 3 && FUSB302_alert(&FUSB302, &FUSB302_events) != FUSB302_SUCCESS; i++) {}
+        if (FUSB302_alert(&FUSB302, &FUSB302_events) != FUSB302_SUCCESS) {
+            return;  // Retry on a later main-loop pass.
+        }
         if (FUSB302_events) {
             handle_FUSB302_event(FUSB302_events);
         }

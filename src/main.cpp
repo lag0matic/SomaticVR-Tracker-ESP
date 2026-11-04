@@ -24,6 +24,7 @@
 #include <i2cscan.h>
 
 #include "ButtonMonitor.h"
+#include "PowerLatch.h"
 #include "ChargerMonitor.h"
 #include "USBPDMonitor.h"
 #include "GlobalVars.h"
@@ -92,8 +93,8 @@ void setup() {
 	buttonMonitor.setup();
 #endif
 #ifdef PIN_ENABLE_LATCH
-	pinMode(PIN_ENABLE_LATCH, OUTPUT);
-	digitalWrite(PIN_ENABLE_LATCH, buttonMonitor.isPressed() ? HIGH : LOW);
+	SlimeVR::setPowerLatch(SlimeVR::shouldLatchAtStartup(
+		buttonMonitor.isPressed(), esp_reset_reason()));
 #endif
 #ifdef PIN_IMU_ENABLE
 	pinMode(PIN_IMU_ENABLE, OUTPUT);
