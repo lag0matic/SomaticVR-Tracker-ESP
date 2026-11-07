@@ -1,59 +1,64 @@
-# SomaticVR Orion - SlimeVR 0.7.4 + battfix
+# SomaticVR Orion - Experimental SlimeVR 0.7.4 Firmware
 
-Firmware version: **`0.7.4-Orion-battfix2`**. This branch combines our working 0.7.4 udpfix port with SomaticVR's `chargerFix` battery/button updates and additional power-latch and PD recovery fixes.
+> **Experimental beta branch. This is a community firmware build for SomaticVR Orion trackers, not an official release from SomaticVR or SlimeVR. Bugs may remain undiscovered.**
 
-**Status: test firmware.** It builds and passes software regression tests. This combined version has not yet been qualified on physical trackers, across flash/OTA resets, or through overnight stack charging. Keep your known-good `0.7.4-Orion-port-udpfix` backup and test one tracker first.
+Current firmware version: **`0.7.4-Orion-battfix2`**  
+Development branch: **`codex/orion-0.7.4-battfix`**
 
-## Additional battfix2 fixes
+## About this branch
 
-Fixes signed LED ramp arithmetic and charging-animation entry, polls the charger even while its interrupt is asserted, and corrects fixed-PDO/PPS diagnostic unit conversions. PD logs describe the negotiated current limit, not measured draw. See CHANGELOG.md.
+This project brings SomaticVR Orion's custom hardware support and firmware behavior into a SlimeVR Tracker ESP 0.7.4-based build. It integrates SomaticVR's Orion-specific changes, including the battery, charging, button, and power-handling updates published on their `chargerFix` branch, along with additional fixes developed while reviewing and testing that code.
 
-## What changed
+The aim is to retain Orion's hardware functionality while supporting the newer SlimeVR firmware behavior. This remains an integration effort under active testing; it should not be treated as a finished or fully validated release.
 
-| Area | Changes from SomaticVR Orion-2 |
-|---|---|
-| SlimeVR 0.7.4 | Upstream protocol 23, sensor acceleration coordinate correction, calibration-file validation, magnetometer timestep handling, sensor timing behavior, buffered logging, benchmarks (disabled by default), updated configuration/reset/serial commands. Orion's quaternion sensor orientation and hardware integration are preserved. |
-| ESP32 networking | Restores Orion's oversized UDP protection using `NetworkUDP::clear()`. Unread oversized datagrams otherwise prevent subsequent server packets from being received. |
-| Battery updates from SomaticVR | Input current limit reduced from 2 A to 1.5 A; charger watchdog explicitly disabled during setup. Battery charge-current setting remains 1 A, charge voltage setting 4.2 V, and thermal-regulation setting 60 C. Other hardware protections and charge safety timer are retained. |
-| Button handling from SomaticVR | Uses elapsed milliseconds rather than loop counts: normal shutdown arms at 2 seconds and occurs on release; full off at 10 seconds. |
-| Power-latch fixes | All latch writes use a common helper that preloads the output before releasing GPIO hold and then restores hold. Charger-triggered HIGH transitions can now change a previously held LOW output. Startup distinguishes cold/charging-only entry from warm resets rather than requiring a held button after software reset. |
-| USB-PD recovery | Unstable CC readings and I2C errors return to the main loop instead of retrying indefinitely. PD servicing makes one alert attempt per call and retries later. Individual I2C operations retain their existing timeout. |
-| Build safeguards | Link-time optimization keeps the final binary inside the existing application partition. Build checks the actual binary size, produces a complete Intel HEX and verifies its checksums and decoded bytes. |
-| Board identity | Uses upstream `BOARD_CUSTOM` (4), avoiding Orion's old ID 27 collision with ESP32-C6 Supermini. Orion pins and sensor mounting remain unchanged. |
+For implementation details and source provenance, see [CHANGELOG.md](CHANGELOG.md).
 
-See [CHANGELOG.md](CHANGELOG.md) for source provenance, startup behavior and differences from the earlier experimental builds.
+## Experimental status and testing
 
-## Build
+The firmware has passed local builds, image-size and HEX validation, and software regression tests. The maintainer has also reported several multi-hour sessions on a test tracker without significant issues, including connection, motion reporting, battery operation, and charging tests.
 
-Requires Git, Python 3.12 and PlatformIO. From this branch:
+That is limited testing on a small set of hardware, not a guarantee of reliability across all trackers, batteries, chargers, or charging-stack configurations. Other bugs may yet be found, including regressions that only appear after extended use or under different operating conditions. Charging, stack handoff, restart behavior, and long-term stability still warrant continued testing.
+
+Keep a known-working firmware backup. Try this build on one tracker before updating a full set, confirm the reported firmware version, and check normal operation and charging afterward. If unexpected behavior occurs, record the firmware version, tracker configuration, and steps needed to reproduce it.
+
+## AI-assisted development
+
+**This branch was developed with assistance from OpenAI Codex.** AI was used to help compare source code, investigate issues, implement changes, write tests, and prepare documentation.
+
+AI-assisted code and analysis can contain mistakes. Successful compilation, automated tests, and limited hardware testing do not prove that every change is correct or that the firmware is safe or reliable in every situation. Independent source review and additional hardware testing are encouraged. Known and undiscovered defects may remain.
+
+This firmware is provided as-is, without warranty, subject to the included licenses. It is not endorsed or certified by SomaticVR or SlimeVR.
+
+## Building
+
+Requires Git, Python 3.12, and PlatformIO. Check out this branch, then run:
 
 ```sh
 python -m pip install -r requirements-build.txt
 python -m platformio run -e BOARD_SOMATICVR_ORION
 ```
 
-The default build version is `0.7.4-Orion-battfix2`; `FIRMWARE_VERSION` can override it. Git revision is embedded separately. Dependency downloads require network access; byte-for-byte identity across different environments is not guaranteed.
+The default firmware version is `0.7.4-Orion-battfix2`. The `FIRMWARE_VERSION` environment variable can override it; the Git revision is embedded separately. Downloading build dependencies requires internet access. Different build environments may produce different binary bytes.
 
-Outputs in `.pio/build/BOARD_SOMATICVR_ORION/`:
+Build outputs are written to `.pio/build/BOARD_SOMATICVR_ORION/`:
 
-- **`firmware.hex`**: merged Intel HEX for Somatic Eros Flasher.
-- `firmware.hex.sha256`: checksum.
-- `firmware.bin`: application-only image, **not** a file to flash at address zero.
+- **`firmware.hex`** - complete Intel HEX image for Somatic Eros Flasher.
+- **`firmware.hex.sha256`** - checksum of the generated HEX image.
+- **`firmware.bin`** - application-only image; **do not flash this file at address zero**.
 
-The existing 4 MiB layout is retained: bootloader `0x0000`, partitions `0x8000`, OTA initialization `0xe000`, application `0x10000`. The merged HEX fills gaps with erased bytes, so the flasher may reset saved Wi-Fi settings. Keep a backup before flashing.
+The build checks that the application fits its partition and verifies the generated HEX against its input bytes. The merged HEX includes boot components and fills gaps with erased bytes; flashing may reset stored Wi-Fi settings depending on the flasher's behavior.
 
-## Validation and first tracker test
+Software regression-test instructions are available in [test/battfix-host/README.md](test/battfix-host/README.md). These tests complement hardware testing; they do not replace it.
 
-Software tests exercise startup reset policy, latch operation order, high/low transitions, failed/unstable PD reads and recovery. See [host-test instructions](test/battfix-host/README.md). CI builds the firmware and runs these tests; it does not validate electrical behavior.
+## Updates
 
-On one tracker, verify button-on/off on battery, cold USB connection, reboot after USB flashing, OTA reboot, sensor motion and sustained Wi-Fi transmission. Then test direct charging, two-tracker handoff, and overnight maintenance. Confirm the displayed firmware version before updating a set.
+The firmware retains SomaticVR's vendor update metadata. Updating through the vendor feed may replace this custom build with vendor firmware. This repository's workflow builds artifacts; it does not automatically publish releases.
 
-## AI-assisted development
+## Credits and licenses
 
-This firmware was developed with assistance from OpenAI Codex. AI-assisted changes can contain errors; successful compilation and software tests do not establish hardware safety or reliability. Review the source and validate it on your hardware before wider use. This is a community fork, not an official SomaticVR or SlimeVR release. Provided as-is under the included licenses, without warranty.
+This work builds on:
 
-## Credits and licensing
+- [SlimeVR Tracker ESP](https://github.com/SlimeVR/SlimeVR-Tracker-ESP), using the supplied 0.7.4 source.
+- [SomaticVR Tracker ESP](https://github.com/SomaticVR/SomaticVR-Tracker-ESP), including Orion-2 hardware support and the published [`chargerFix` updates](https://github.com/SomaticVR/SomaticVR-Tracker-ESP/tree/chargerFix).
 
-Based on SlimeVR Tracker ESP 0.7.4, SomaticVR Orion-2, and SomaticVR's `chargerFix` branch. Original copyright notices are retained. See LICENSE-MIT and LICENSE-APACHE, plus individual vendored-library licenses.
-
-Vendor OTA/update metadata remains pointed at SomaticVR; using that feed may replace this custom build. This repository's workflow only builds artifacts and does not publish releases automatically. Device flash dumps, personal credentials and diagnostic logs are not included.
+Original copyright notices and licenses are retained. See [LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE), and the licenses accompanying individual vendored libraries.
